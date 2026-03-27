@@ -21,3 +21,16 @@ Updated at the end of each phase with Python-specific observations, library quir
 - **Stateful reader instances** should reset internal state (like `_detected_tool`) at the start of each public method call to support reuse.
 - **Edge-case tests matter:** error on first line (empty context_before), error on last line (truncated context_after), and consecutive errors should all be explicitly tested.
 - **Known limitation:** errors within the context-after window of a previous error are captured as context, not separate events. Acceptable for now, tracked for future improvement.
+
+---
+
+## Phase 2 — Sanitizer
+
+- **Use battle-tested libraries for security-critical code.** Original plan was homegrown regex — switched to `detect-secrets` (Yelp). 28+ detectors, entropy-based detection, maintained by a security team. Don't reinvent this.
+- **detect-secrets `secret_value` is often just a prefix.** GitHub tokens return `"ghp"`, not the full token. Using `str.replace(secret_value, tag)` leaves the actual secret visible. Must extend to the full token boundary with `re.escape(prefix) + r"\S*"`.
+- **Private keys are multi-line.** detect-secrets only flags the `BEGIN` line. Post-processing needed to redact the entire BEGIN-through-END block including the key body.
+- **detect-secrets doesn't catch everything.** Missing: URL passwords (`://user:pass@host`), Azure SAS tokens (`sig=...`), Azure AccountKey in connection strings. Custom post-processors needed on top.
+- **`secret_value=None` is a real code path.** Some detectors don't expose the matched value. Must handle this — either redact conservatively or skip (don't emit a false Redaction).
+- **Temp files need private directories.** `NamedTemporaryFile` in `/tmp` is readable by other users on some systems. Use `tempfile.mkdtemp()` + cleanup in `finally`.
+- **Frozen dataclasses with mutable fields are misleading.** `frozen=True` prevents attribute reassignment but doesn't prevent mutating a `list`. Use `tuple` for truly immutable collections.
+- **Tests must verify full secret removal, not just partial.** A test checking `"ghp_ABC..." not in output` passes even when 95% of the token leaks. Check the body/suffix too.
