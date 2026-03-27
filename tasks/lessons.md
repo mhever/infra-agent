@@ -34,3 +34,13 @@ Updated at the end of each phase with Python-specific observations, library quir
 - **Temp files need private directories.** `NamedTemporaryFile` in `/tmp` is readable by other users on some systems. Use `tempfile.mkdtemp()` + cleanup in `finally`.
 - **Frozen dataclasses with mutable fields are misleading.** `frozen=True` prevents attribute reassignment but doesn't prevent mutating a `list`. Use `tuple` for truly immutable collections.
 - **Tests must verify full secret removal, not just partial.** A test checking `"ghp_ABC..." not in output` passes even when 95% of the token leaks. Check the body/suffix too.
+
+---
+
+## Phase 3 — Analyzer (LLM Integration)
+
+- **`httpx.AsyncClient` should be reused across calls.** Creating a new client per request wastes connections. Make the class an async context manager that owns a single client. Tracked for Phase 4 integration.
+- **`httpx.MockTransport` is the clean way to test async HTTP.** No patching needed — create a mock handler function and pass it as the transport. Works naturally with async/await.
+- **Don't use `assert` for runtime validation in production code.** Python strips `assert` with `-O` flag. Use explicit `if not ...: raise` instead. Not a bug here (exceptions still caught), but a code smell.
+- **Provider abstraction with Protocol works well.** OpenRouter (OpenAI-compatible) and Anthropic have different request/response formats. Protocol class + two implementations keeps it clean without inheritance.
+- **Response parsing from LLMs is inherently fuzzy.** Heuristic section detection with graceful fallback (sections -> paragraphs -> single blob) is the right approach for MVP. Don't over-engineer structured output parsing.
