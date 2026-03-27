@@ -1,3 +1,5 @@
 """Terminal user interface components."""
 
-__all__: list[str] = []
+from infra_agent.ui.app import InfraAgentApp
+
+__all__ = ["InfraAgentApp"]

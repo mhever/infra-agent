@@ -317,11 +317,29 @@ _INITIAL_BACKOFF_S = 1.0
 
 
 class Analyzer:
-    """Orchestrates LLM calls with retry logic and response parsing."""
+    """Orchestrates LLM calls with retry logic and response parsing.
+
+    Use as an async context manager to manage the underlying HTTP client lifecycle::
+
+        async with Analyzer(config) as analyzer:
+            result = await analyzer.analyze(event, context)
+    """
 
     def __init__(self, config: Settings) -> None:
         self._provider: OpenRouterProvider | AnthropicProvider = create_provider(config)
-        self._timeout = _DEFAULT_TIMEOUT_S
+        self._timeout = config.timeout
+        self._client: httpx.AsyncClient | None = None
+
+    async def __aenter__(self) -> Analyzer:
+        """Create the shared HTTP client."""
+        self._client = httpx.AsyncClient(timeout=self._timeout)
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        """Close the shared HTTP client."""
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
 
     async def analyze(
         self,
@@ -356,7 +374,12 @@ class Analyzer:
         system_prompt: str,
         user_prompt: str,
     ) -> ProviderResponse:
-        """Call the provider, retrying on rate-limit with exponential backoff."""
+        """Call the provider, retrying on rate-limit with exponential backoff.
+
+        Uses the shared ``self._client`` when available (i.e. when the
+        ``Analyzer`` is used as an async context manager).  Falls back to
+        creating a one-shot client for backwards compatibility.
+        """
         import asyncio
 
         backoff = _INITIAL_BACKOFF_S
@@ -364,6 +387,9 @@ class Analyzer:
 
         for attempt in range(_MAX_RETRIES + 1):
             try:
+                if self._client is not None:
+                    return await self._provider.call(system_prompt, user_prompt, self._client)
+                # Fallback: no context manager — create ephemeral client.
                 async with httpx.AsyncClient(timeout=self._timeout) as client:
                     return await self._provider.call(system_prompt, user_prompt, client)
             except httpx.TimeoutException as exc:
