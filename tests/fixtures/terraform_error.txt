@@ -1,0 +1,21 @@
+Terraform v1.9.5
+on linux_amd64
+
+Initializing the backend...
+
+Initializing provider plugins...
+- Finding hashicorp/azurerm versions matching "~> 3.0"...
+- Installing hashicorp/azurerm v3.116.0...
+- Installed hashicorp/azurerm v3.116.0 (signed by HashiCorp)
+
+Terraform has been successfully initialized!
+
+azurerm_resource_group.example: Creating...
+
+Error: creating Resource Group "rg-example": authorization failed
+
+  on main.tf line 12, in resource "azurerm_resource_group" "example":
+  12: resource "azurerm_resource_group" "example" {
+
+The current principal does not have the required permissions to
+create Resource Group "rg-example" in subscription "xxxxxxxx".
